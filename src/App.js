@@ -12,6 +12,7 @@ function useOnScreen(ref, options) {
             setVisible(entry.isIntersecting);
         }, options);
 
+
         if(ref.current) {
             observer.observe(ref.current);
         }
