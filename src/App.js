@@ -1,80 +1,126 @@
-import React, {useEffect, useRef, useState} from 'react';
-import logo from './logo.svg';
-import './App.css';
-import { useMachine } from '@xstate/react';
-import { toggleMachine } from './toggleMachine';
+import React from "react";
 
-function useOnScreen(ref, options) {
-    const [visible, setVisible] = useState(false);
 
-    useEffect(() => {
-        const observer = new IntersectionObserver(([entry]) => {
-            setVisible(entry.isIntersecting);
-        }, options);
+const types = {
+    start: "START",
+    loaded: "LOADED"
+};
 
-        if(ref.current) {
-            observer.observe(ref.current);
+const reducer = (state, action) => {
+    switch (action.type) {
+        case types.start:
+            return { ...state, loading: true };
+        case types.loaded:
+            return {
+                ...state,
+                loading: false,
+                data: [...state.data, ...action.newData],
+                more: action.newData.length === 1,
+                after: state.after + 1
+            };
+        default:
+            throw new Error("Don't understand action");
+    }
+};
+
+const MyContext = React.createContext();
+
+export function MyProvider({ children }) {
+    const [state, dispatch] = React.useReducer(reducer, {
+        loading: false,
+        more: true,
+        data: [],
+        after: 1
+    });
+    const { loading, data, after, more } = state;
+
+    const load = () => {
+        dispatch({ type: types.start });
+
+        setTimeout(() => {
+            const url = 'https://jsonplaceholder.typicode.com/posts/' + after;
+            fetch(url)
+            .then(r => r)
+            .then(r => r.json())
+            .then(data => {
+                const newData = [ data ];
+                dispatch({ type: types.loaded, newData });
+            });
+
+
+        }, 500);
+    };
+
+    return (
+        <MyContext.Provider value={{ loading, data, more, load }}>
+            {children}
+        </MyContext.Provider>
+    );
+}
+
+export default function App() {
+    const { data, loading, more, load } = React.useContext(MyContext);
+    const loader = React.useRef(load);
+    const observer = React.useRef(
+        new IntersectionObserver(
+            entries => {
+                const first = entries[0];
+                if (first.isIntersecting) {
+                    loader.current();
+                }
+            },
+            { threshold: 1 }
+        )
+    );
+    const [element, setElement] = React.useState(null);
+
+    React.useEffect(() => {
+        loader.current = load;
+    }, [load]);
+
+    React.useEffect(() => {
+        const currentElement = element;
+        const currentObserver = observer.current;
+
+        if (currentElement) {
+            currentObserver.observe(currentElement);
         }
 
         return () => {
-              if(ref.current) {
-                  observer.unobserve(ref.current);
-              }
+            if (currentElement) {
+                currentObserver.unobserve(currentElement);
+            }
         };
+    }, [element]);
 
-    }, [ ref, options ]);
-
-    return visible;
-}
-
-function App() {
-    const [ current, send ] = useMachine(toggleMachine);
-    const styles = current.value === 'active' ? { background: 'red' } : { background: 'yellow' };
-    const ref = useRef();
-    const visible = useOnScreen(ref,{ rootMargin: '0px', threshold: .5 });
+    const boxStyle = {
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        background: 'pink',
+        border: '4px solid purple',
+        marginBottom: '5px',
+        height: '50vh', width: '100%' };
 
     return (
-        <div  className="App">
-          <header style={{ display: 'block',  ...styles}} className="App-header">
-            <img src={logo} className="App-logo" alt="logo" />
-            <hr style={{width:'100%'}} />
-            <button style={{fontSize: '36px'}} onClick={() => send('TOGGLE')}>Toggle</button>
-          </header>
-          <div style={{ height: '90vh', background: 'pink', borderBottom: '4px solid black' }} >
-              <h2>Scroll Down</h2>
-          </div>
-          <div ref={ref}
-               style={{
-                   position: 'relative',
-                   height: '100vh',
-                   background: visible ? '#8abf8a' : '#f5ebc1',
-                   display: 'flex',
-                   justifyContent: 'center',
-                   alignItems: 'center',
-                   transition: 'all 1s',
-               }} >
-              <div style={{
-                  position: 'absolute',
-                  top: '0',
-                  left: '0',
-                  height: '500px',
-                  width: '50px',
-                  background: 'navy',
-                  border: '1px solid #fff'
-              }}>X</div>
-              {visible &&
-                <div style={{ padding: '3rem' }}>
-                    <img alt="random pic" src="https://picsum.photos/200/300?random=1" />
-                </div>
-              }
-              {!visible &&
-                 <div>
-                     <h2>Keep scrolling...</h2>
-                 </div>
-              }
-          </div>
-        </div>
-      );
-}
+        <div className="App">
+            <div style={{ width: '100%', background: '#fff' }} >
+                {data.map(post => (
+                    <div key={post.id} style={boxStyle}>
+                        <h3 style={{fontSize: '28px'}}>{post.title}</h3>
+                        <p style={{ width: '480px'}}>{post.body}</p>
+                    </div>
+                ))}
 
-export default App;
+                {loading && <div style={{...boxStyle, ...{ background: 'green' }}}>
+                                <h3>Loading...</h3>
+                            </div>}
+
+                {!loading && more && (
+                    <div ref={setElement} style={{ background: "transparent" }}></div>
+                )}
+            </div>
+        </div>
+    );
+}
