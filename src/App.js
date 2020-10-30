@@ -31,7 +31,7 @@ function App() {
     const [ current, send ] = useMachine(toggleMachine);
     const styles = current.value === 'active' ? { background: 'red' } : { background: 'yellow' };
     const ref = useRef();
-    const visible = useOnScreen(ref,{ rootMargin: '-100px' });
+    const visible = useOnScreen(ref,{ rootMargin: '0px', threshold: .5 });
 
     return (
         <div  className="App">
@@ -45,6 +45,7 @@ function App() {
           </div>
           <div ref={ref}
                style={{
+                   position: 'relative',
                    height: '100vh',
                    background: visible ? '#8abf8a' : '#f5ebc1',
                    display: 'flex',
@@ -52,6 +53,15 @@ function App() {
                    alignItems: 'center',
                    transition: 'all 1s',
                }} >
+              <div style={{
+                  position: 'absolute',
+                  top: '0',
+                  left: '0',
+                  height: '500px',
+                  width: '50px',
+                  background: 'navy',
+                  border: '1px solid #fff'
+              }}>X</div>
               {visible &&
                 <div style={{ padding: '3rem' }}>
                     <img alt="random pic" src="https://picsum.photos/200/300?random=1" />
